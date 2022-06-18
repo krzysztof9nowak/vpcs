@@ -141,6 +141,7 @@ static cmdStub cmd_entry[] = {
 	{"version",	NULL,	run_ver,	NULL},
 	{"sleep",	NULL,	run_sleep,	help_sleep},
 	{"zzz",		NULL,	run_sleep,	help_sleep},
+	{"webserver", NULL, run_webserver, NULL},
 	{NULL, NULL}
 };
 

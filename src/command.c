@@ -2136,4 +2136,23 @@ int str2color(const char *cstr)
 	else
 		return 30 + i;
 }
+
+int run_webserver(int argc, char **argv){
+	printf("Hello, I am a webserver!\n");
+
+	struct packet *p;
+	pcs *pc = &vpc[pcid];
+
+	while (true) {
+		if((p = deq(&pc->iq)) != NULL){
+			printf("Jakiś szajs przyszedł!\n");
+		}
+	}
+
+
+
+	return 0;
+}
+
+
 /* end of file */
