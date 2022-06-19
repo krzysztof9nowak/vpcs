@@ -449,14 +449,18 @@ int tcpReplyPacket(tcphdr *th, sesscb *cb, int tcplen)
 	cb->winsize = ntohs(th->th_win);
 	
 	if (cb->flags != (TH_RST | TH_FIN)) {		
+		printf("Not rst fin\n");
 		switch (th->th_flags) {
 			case TH_SYN:
 				cb->flags = TH_ACK | TH_SYN;
 				cb->ack++;
 				break;
 			case TH_ACK | TH_PUSH:
+				printf("ack push\n");
+
 				cb->flags = TH_ACK;
 				dsize = tcplen - (th->th_off << 2);
+				printf("dsize %d\n", dsize);
 				break;
 			case TH_ACK | TH_FIN:
 				cb->flags = (TH_ACK | TH_FIN);
@@ -635,14 +639,15 @@ struct packet *tcpReply(struct packet *m0, sesscb *cb)
 	tcphdr *th = (tcphdr *)(ip + 1);
 	char *end_of_message = (char*)(m->data) + m->len;
 	
-	int length_of_tcp_packet = end_of_message - (char*)th;
+	printf("ti_len %d\n", ti->ti_len);
+	int received_tcp_length = ntohs(ip->len) - sizeof(iphdr);
 
 	ip->len = htons(end_of_message - (char*)ip);
 	ip->dip ^= ip->sip;
 	ip->sip ^= ip->dip;
 	ip->dip ^= ip->sip;
 	
-	int rt = tcpReplyPacket(th, cb, length_of_tcp_packet);
+	int rt = tcpReplyPacket(th, cb, received_tcp_length);
 	if (rt == 0) {
 		del_pkt(m);
 		return NULL;
@@ -651,7 +656,7 @@ struct packet *tcpReply(struct packet *m0, sesscb *cb)
 	// TCP pseudo header for purposes of TCP checksum calculation
 	char *tcp_pseudo_header = ((char*)ti) + 8;
 	ip->ttl = 0;
-	ip->cksum = length_of_tcp_packet;
+	ip->cksum = sizeof(tcpiphdr);
 	ti->ti_len = htons(sizeof(tcphdr));
 	
 	ti->ti_sum = 0;
