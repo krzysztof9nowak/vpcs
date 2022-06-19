@@ -614,50 +614,46 @@ int tcp(pcs *pc, struct packet *m)
 
 struct packet *tcpReply(struct packet *m0, sesscb *cb)
 {
-	ethdr *eh;
-	iphdr *ip;
-	tcpiphdr *ti;
-	tcphdr *th;
 	struct packet *m;
-	char b[9];
-	int len;
 
-	int tcplen = 0;
-	
-	len = sizeof(ethdr) + sizeof(iphdr) + sizeof(tcphdr);
-	m = new_pkt(len);
+	m = new_pkt(sizeof(ethdr) + sizeof(iphdr) + sizeof(tcphdr));
 	if (m == NULL)
 		return NULL;
+	
 	memcpy(m->data, m0->data, m->len);
 	
-	eh = (ethdr *)(m->data);
-	ip = (iphdr *)(eh + 1);
-	ti = (tcpiphdr *)ip;
-	th = (tcphdr *)(ip + 1);
+	ethdr *eh = (ethdr *)(m->data);
+	iphdr *ip = (iphdr *)(eh + 1);
+	tcpiphdr *ti = (tcpiphdr *)ip;
+	tcphdr *th = (tcphdr *)(ip + 1);
+	char *end_of_message = (char*)(m->data) + m->len;
 	
-	tcplen = ntohs(ip->len) - sizeof(iphdr);
-	ip->len = htons(len - sizeof(ethdr));
+	int length_of_tcp_packet = end_of_message - (char*)th;
 	
+	ip->len = htons(end_of_message - (char*)ip);
 	ip->dip ^= ip->sip;
 	ip->sip ^= ip->dip;
 	ip->dip ^= ip->sip;
-	ip->ttl = TTL;
 	
-	int rt = tcpReplyPacket(th, cb, tcplen);
+	int rt = tcpReplyPacket(th, cb, length_of_tcp_packet);
 	if (rt == 0) {
 		del_pkt(m);
 		return NULL;
 	} 
 			
-	ti->ti_len = htons(len - sizeof(iphdr));
-	
-	bcopy(((struct ipovly *)ip)->ih_x1, b, 9);
-	bzero(((struct ipovly *)ip)->ih_x1, 9);
+	// TCP pseudo header for purposes of TCP checksum calculation
+	char *tcp_pseudo_header = ((char*)ti) + 8;
+	ip->ttl = 0;
+	ip->cksum = length_of_tcp_packet;
+	ti->ti_len = htons(sizeof(tcphdr));
 	
 	ti->ti_sum = 0;
-	ti->ti_sum = cksum((u_short*)ti, len);
-	bcopy(b, ((struct ipovly *)ip)->ih_x1, 9);
+	ti->ti_sum = cksum((u_short*)tcp_pseudo_header, end_of_message - tcp_pseudo_header);
 
+	// restore values in IP header
+	ip->ttl = TTL;
+
+	// calculate checksum of IP header
 	ip->cksum = 0;
 	ip->cksum = cksum((u_short *)ip, sizeof(iphdr));
 	
