@@ -506,6 +506,12 @@ int tcp(pcs *pc, struct packet *m)
 	if (ip->dip != pc->ip4.ip)
 		return PKT_DROP;
 
+	// printf("sock: %d\n", pc->mscb.sock);
+	// printf("dport %d %d\n", ntohs(ti->ti_dport), pc->mscb.sport);
+	// printf("sport %d %d\n", ntohs(ti->ti_sport), pc->mscb.dport);
+	// printf("sip %d %d\n", ip->sip, pc->mscb.dip);
+	// printf("proto %d %d\n", ip->proto, pc->mscb.proto);
+
 	/* response packet 
 	 * 1. socket opened
 	 * 2. same port
@@ -560,6 +566,7 @@ int tcp(pcs *pc, struct packet *m)
 				cb->dip = ip->dip;
 				cb->sport = ti->ti_sport;
 				cb->dport = ti->ti_dport;
+				cb->proto = ip->proto;
 				
 				break;
 			}
@@ -621,7 +628,7 @@ struct packet *tcpReply(struct packet *m0, sesscb *cb)
 		return NULL;
 	
 	memcpy(m->data, m0->data, m->len);
-	
+
 	ethdr *eh = (ethdr *)(m->data);
 	iphdr *ip = (iphdr *)(eh + 1);
 	tcpiphdr *ti = (tcpiphdr *)ip;
@@ -629,7 +636,7 @@ struct packet *tcpReply(struct packet *m0, sesscb *cb)
 	char *end_of_message = (char*)(m->data) + m->len;
 	
 	int length_of_tcp_packet = end_of_message - (char*)th;
-	
+
 	ip->len = htons(end_of_message - (char*)ip);
 	ip->dip ^= ip->sip;
 	ip->sip ^= ip->dip;
@@ -640,7 +647,7 @@ struct packet *tcpReply(struct packet *m0, sesscb *cb)
 		del_pkt(m);
 		return NULL;
 	} 
-			
+	
 	// TCP pseudo header for purposes of TCP checksum calculation
 	char *tcp_pseudo_header = ((char*)ti) + 8;
 	ip->ttl = 0;
@@ -836,4 +843,31 @@ struct packet *tcp6Reply(struct packet *m0, sesscb *cb)
 		
 	return m;	
 }
+
+sesscb *tcp_listen(pcs *pc, int port){
+	pc->tcp_listen_port = port;
+
+	while(true){
+		for (int i = 0; i < MAX_SESSIONS; i++) {
+			if(ntohs(pc->sesscb[i].dport) == port){
+				pc->mscb = pc->sesscb[i];
+				u_int temp;
+
+				temp = pc->mscb.dport;
+				pc->mscb.dport = ntohs(pc->mscb.sport);
+				pc->mscb.sport = ntohs(temp);
+
+				temp = pc->mscb.sip;
+				pc->mscb.sip = pc->mscb.dip;
+				pc->mscb.dip = temp;
+
+				pc->mscb.sock = 1;
+
+				return &pc->mscb;
+			}
+		}
+	}
+	return 0;
+}
+
 /* end of file */

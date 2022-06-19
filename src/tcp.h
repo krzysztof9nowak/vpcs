@@ -31,6 +31,7 @@
 int tcp_open(pcs *pc, int ipv);
 int tcp_send(pcs *pc, int ipv);
 int tcp_close(pcs *pc, int ipv);
+sesscb *tcp_listen(pcs *pc, int port);
 
 int tcp(pcs *pc, struct packet *m0);
 struct packet *tcpReply(struct packet *m0, sesscb *cb);

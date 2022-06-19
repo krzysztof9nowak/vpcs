@@ -2142,14 +2142,21 @@ int run_webserver(int argc, char **argv){
 
 	struct packet *p;
 	pcs *pc = &vpc[pcid];
+	sesscb *cb = tcp_listen(pc, 2137);
+	printf("Zaakceptowana połączenie \n");
 
 	while (true) {
 		if((p = deq(&pc->iq)) != NULL){
 			printf("Jakiś szajs przyszedł!\n");
+			struct packet *reply = tcpReply(p, cb);
+			if(reply){
+				enq(&pc->oq, reply);
+			}
+
+			write(1, p->data, p->len);
+			fflush(stdout);
 		}
 	}
-
-
 
 	return 0;
 }
