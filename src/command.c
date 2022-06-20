@@ -51,6 +51,8 @@
 #include "help.h"
 #include "dump.h"
 #include "relay.h"
+#include "http.h"
+#include "website.h"
 
 extern int pcid;
 extern int devtype;
@@ -2156,8 +2158,10 @@ int run_webserver(int argc, char **argv){
 			write(1, tcp_get_data(p), tcp_get_length(p));
 			fflush(stdout);
 
-			const char* webpage = "Moja strona WWW jest w tym stringu!\n\n\0";
-			struct packet *m = tcp_prepare_packet(&pc->mscb, webpage, strlen(webpage)+2);
+			int len;
+			char* http_response = prepare_http_response(200, website_html, website_html_len, &len);
+			struct packet *m = tcp_prepare_packet(&pc->mscb, http_response, len);
+			free(http_response);
 			enq(&pc->oq, m);
 			break;
 		}

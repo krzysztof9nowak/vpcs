@@ -4,7 +4,7 @@ OSTYPE=Linux
 CPUTYPE:=$(shell uname -m)
 HVOPT=-DHV
 
-CFLAGS=-D$(OSTYPE) -D$(CPUTYPE) $(HVOPT) -Wall -DTAP
+CFLAGS=-D$(OSTYPE) -D$(CPUTYPE) $(HVOPT) -Wall -DTAP -g
 LDFLAGS=-lpthread -lutil
 OBJS=vpcs.o \
 	daemon.o \
@@ -27,12 +27,17 @@ OBJS=vpcs.o \
 	relay.o \
 	hv.o \
 	frag.o \
-	frag6.o
+	frag6.o \
+	http.o \
+	website.o
 	
 all: vpcs
 
 vpcs: $(OBJS)
 	$(CC) $(OBJS) -o vpcs $(LDFLAGS) 
+
+website.c: website.html
+	xxd -i website.html > website.c
 
 .c.o: keys.h vpcs.h packets.h dhcp.h
 	$(CC) $(INCLUDE_PATH) $(CFLAGS) -c $<

@@ -28,7 +28,8 @@ OBJS=vpcs.o \
 	relay.o \
 	hv.o \
 	frag.o \
-	frag6.o
+	frag6.o \
+	http.o
 
 debug: all
 all: vpcs
