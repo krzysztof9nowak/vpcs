@@ -449,18 +449,14 @@ int tcpReplyPacket(tcphdr *th, sesscb *cb, int tcplen)
 	cb->winsize = ntohs(th->th_win);
 	
 	if (cb->flags != (TH_RST | TH_FIN)) {		
-		printf("Not rst fin\n");
 		switch (th->th_flags) {
 			case TH_SYN:
 				cb->flags = TH_ACK | TH_SYN;
 				cb->ack++;
 				break;
 			case TH_ACK | TH_PUSH:
-				printf("ack push\n");
-
 				cb->flags = TH_ACK;
 				dsize = tcplen - (th->th_off << 2);
-				printf("dsize %d\n", dsize);
 				break;
 			case TH_ACK | TH_FIN:
 				cb->flags = (TH_ACK | TH_FIN);
@@ -485,7 +481,8 @@ int tcpReplyPacket(tcphdr *th, sesscb *cb, int tcplen)
 	}
 	if (th->th_flags != TH_SYN)
 		cb->seq = ntohl(th->th_ack);
-	th->th_ack = htonl(cb->ack + dsize);
+	cb->ack += dsize;
+	th->th_ack = htonl(cb->ack);
 	th->th_seq = htonl(cb->seq);
 	th->th_flags = cb->flags;
 	
@@ -501,7 +498,8 @@ int tcpReplyPacket(tcphdr *th, sesscb *cb, int tcplen)
 
 int tcp(pcs *pc, struct packet *m)
 {
-	iphdr *ip = (iphdr *)(m->data + sizeof(ethdr));
+	ethdr *ethernet_header = (ethdr*)(m->data);
+	iphdr *ip = (iphdr *)(ethernet_header + 1);
 	tcpiphdr *ti = (tcpiphdr *)(ip);
 	sesscb *cb = NULL;
 	struct packet *p = NULL;
@@ -571,6 +569,8 @@ int tcp(pcs *pc, struct packet *m)
 				cb->sport = ti->ti_sport;
 				cb->dport = ti->ti_dport;
 				cb->proto = ip->proto;
+				bcopy(ethernet_header->src, cb->dmac, ETH_ALEN);
+				bcopy(ethernet_header->dst, cb->smac, ETH_ALEN);
 				
 				break;
 			}
@@ -639,7 +639,6 @@ struct packet *tcpReply(struct packet *m0, sesscb *cb)
 	tcphdr *th = (tcphdr *)(ip + 1);
 	char *end_of_message = (char*)(m->data) + m->len;
 	
-	printf("ti_len %d\n", ti->ti_len);
 	int received_tcp_length = ntohs(ip->len) - sizeof(iphdr);
 
 	ip->len = htons(end_of_message - (char*)ip);
@@ -849,6 +848,81 @@ struct packet *tcp6Reply(struct packet *m0, sesscb *cb)
 	return m;	
 }
 
+char *tcp_get_data(struct packet *m){
+	ethdr *eh = (ethdr *)(m->data);
+	iphdr *ip = (iphdr *)(eh + 1);
+	tcphdr *th = (tcphdr *)(ip + 1);
+
+	return (char*)(th) + 4*th->th_off;
+}
+
+int tcp_get_length(struct packet *m){
+	return m->data + m->len - tcp_get_data(m);
+}
+
+struct packet *tcp_prepare_packet(sesscb *cb, const char* data, int len){
+	struct packet* p = new_pkt(sizeof(ethdr) + sizeof(tcpiphdr) + len);
+
+	ethdr *eh = (ethdr *)(p->data);
+	iphdr *ip = (iphdr *)(eh + 1);
+	tcpiphdr *ti = (tcpiphdr *)ip;
+	tcphdr *th = (tcphdr *)(ip + 1);
+	char *payload = (char*)(th + 1);
+	char *end_of_message = (char*)(p->data) + p->len;
+
+
+	// payload
+	bcopy(data, payload, len);
+
+	// tcp
+	th->th_sport = htons(cb->sport);
+	th->th_dport = htons(cb->dport);
+	th->th_seq = htonl(cb->seq);
+	th->th_ack = htonl(cb->ack);
+	cb->flags = TH_PUSH | TH_ACK;
+	th->th_flags = cb->flags;
+	th->th_off = sizeof(tcphdr) >> 2;
+	th->th_win = htons(1000);
+
+
+	cb->seq += len;
+
+	// ip
+	ip->ver = 4;
+	ip->ihl = sizeof *ip >> 2;
+	ip->tos = 0x10;
+	ip->id = 0;
+	ip->ttl = TTL;
+	ip->proto = cb->proto;
+	ip->dip = cb->dip;
+	ip->sip = cb->sip;
+	ip->len = htons(end_of_message - (char*)ip);
+	ip->proto = IPPROTO_TCP;
+
+
+
+	// TCP pseudo header for purposes of TCP checksum calculation
+	char *tcp_pseudo_header = ((char*)ti) + 8;
+	ip->ttl = 0;
+	ip->cksum = sizeof(tcpiphdr);
+	ti->ti_len = htons(end_of_message - (char*)th);
+	
+	ti->ti_sum = 0;
+	ti->ti_sum = cksum((u_short*)tcp_pseudo_header, end_of_message - tcp_pseudo_header);
+
+	// restore values in IP header
+	ip->ttl = TTL;
+
+	// calculate checksum of IP header
+	ip->cksum = 0;
+	ip->cksum = cksum((u_short *)ip, sizeof(iphdr));
+
+	// ethernet
+	encap_ehead(p->data, cb->smac, cb->dmac, ETHERTYPE_IP);
+
+	return p;
+}
+
 sesscb *tcp_listen(pcs *pc, int port){
 	pc->tcp_listen_port = port;
 
@@ -871,6 +945,7 @@ sesscb *tcp_listen(pcs *pc, int port){
 				return &pc->mscb;
 			}
 		}
+		sleep(1);
 	}
 	return 0;
 }

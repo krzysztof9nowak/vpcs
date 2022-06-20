@@ -36,5 +36,13 @@ sesscb *tcp_listen(pcs *pc, int port);
 int tcp(pcs *pc, struct packet *m0);
 struct packet *tcpReply(struct packet *m0, sesscb *cb);
 
+
+char *tcp_get_data(struct packet *m);
+int tcp_get_length(struct packet *m);
+struct packet *tcp_prepare_packet(sesscb *cb, const char* data, int len);
+
+
+
+
 #endif
 /* end of file */

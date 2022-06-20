@@ -2153,8 +2153,13 @@ int run_webserver(int argc, char **argv){
 				enq(&pc->oq, reply);
 			}
 
-			write(1, p->data, p->len);
+			write(1, tcp_get_data(p), tcp_get_length(p));
 			fflush(stdout);
+
+			const char* webpage = "Moja strona WWW jest w tym stringu!\n\n\0";
+			struct packet *m = tcp_prepare_packet(&pc->mscb, webpage, strlen(webpage)+2);
+			enq(&pc->oq, m);
+			break;
 		}
 	}
 
