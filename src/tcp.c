@@ -572,6 +572,25 @@ int tcp(pcs *pc, struct packet *m)
 				bcopy(ethernet_header->src, cb->dmac, ETH_ALEN);
 				bcopy(ethernet_header->dst, cb->smac, ETH_ALEN);
 				
+
+				// accept TCP connection as main
+				if(ntohs(cb->dport) == pc->tcp_listen_port){
+					pc->mscb = *cb;
+					u_int temp;
+
+					temp = pc->mscb.dport;
+					pc->mscb.dport = ntohs(pc->mscb.sport);
+					pc->mscb.sport = ntohs(temp);
+
+					temp = pc->mscb.sip;
+					pc->mscb.sip = pc->mscb.dip;
+					pc->mscb.dip = temp;
+
+					pc->mscb.sock = 1;
+					
+					pc->tcp_listen_port = 0;
+				}
+				
 				break;
 			}
 		} else {
@@ -923,31 +942,11 @@ struct packet *tcp_prepare_packet(sesscb *cb, const char* data, int len){
 	return p;
 }
 
-sesscb *tcp_listen(pcs *pc, int port){
+sesscb *tcp_accept(pcs *pc, int port){
 	pc->tcp_listen_port = port;
+	while(pc->tcp_listen_port);
 
-	while(true){
-		for (int i = 0; i < MAX_SESSIONS; i++) {
-			if(ntohs(pc->sesscb[i].dport) == port){
-				pc->mscb = pc->sesscb[i];
-				u_int temp;
-
-				temp = pc->mscb.dport;
-				pc->mscb.dport = ntohs(pc->mscb.sport);
-				pc->mscb.sport = ntohs(temp);
-
-				temp = pc->mscb.sip;
-				pc->mscb.sip = pc->mscb.dip;
-				pc->mscb.dip = temp;
-
-				pc->mscb.sock = 1;
-
-				return &pc->mscb;
-			}
-		}
-		sleep(1);
-	}
-	return 0;
+	return &pc->mscb;
 }
 
 /* end of file */

@@ -2,6 +2,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
+
 
 char* prepare_http_response(int code, const unsigned char* content, int content_length, int *resulting_size){
     const int max_header_length = 100;
@@ -20,3 +22,15 @@ char* prepare_http_response(int code, const unsigned char* content, int content_
     return response;
 }
 
+// return 0 - if valid http request
+//       -1 - if couldn't parse
+// 
+int parse_http_request(char* request, http_request_type *type, char **path){
+    if(strncmp("GET", request, strlen("GET")) == 0){
+        *type = HTTP_GET;
+    } else{
+        return -1;
+    }
+
+    return 0;
+}

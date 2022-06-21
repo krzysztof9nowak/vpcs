@@ -128,7 +128,7 @@ typedef struct {
 	hipv6 ip6;
 	hipv6 link6;
 	int mtu;
-	int tcp_listen_port;
+	volatile int tcp_listen_port;
 } pcs;
 
 struct echoctl {

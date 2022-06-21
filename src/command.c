@@ -2139,31 +2139,43 @@ int str2color(const char *cstr)
 		return 30 + i;
 }
 
+const char* ip_to_string(u_int addr){
+	struct in_addr in;
+	in.s_addr = addr;
+	return inet_ntoa(in);
+}
+
 int run_webserver(int argc, char **argv){
 	printf("Hello, I am a webserver!\n");
 
 	struct packet *p;
 	pcs *pc = &vpc[pcid];
-	sesscb *cb = tcp_listen(pc, 2137);
-	printf("Zaakceptowana połączenie \n");
+	while(true){
+		sesscb *cb = tcp_accept(pc, 80);
 
-	while (true) {
-		if((p = deq(&pc->iq)) != NULL){
-			printf("Jakiś szajs przyszedł!\n");
-			struct packet *reply = tcpReply(p, cb);
-			if(reply){
-				enq(&pc->oq, reply);
+		printf("Accepting connection from %s\n", ip_to_string(cb->dip));
+
+		while (true) {
+			if((p = deq(&pc->iq)) != NULL){
+				struct packet *reply = tcpReply(p, cb);
+				if(reply){
+					enq(&pc->oq, reply);
+				}
+
+				http_request_type req_type;
+				if(parse_http_request(tcp_get_data(p), &req_type, 0) == 0){
+					printf("Anwsering GET request\n");
+					int len;
+					char* http_response = prepare_http_response(200, website_html, website_html_len, &len);
+					struct packet *m = tcp_prepare_packet(&pc->mscb, http_response, len);
+					free(http_response);
+					enq(&pc->oq, m);
+
+					printf("Closing \n");
+					tcp_close(pc, 4);
+					break;
+				}
 			}
-
-			write(1, tcp_get_data(p), tcp_get_length(p));
-			fflush(stdout);
-
-			int len;
-			char* http_response = prepare_http_response(200, website_html, website_html_len, &len);
-			struct packet *m = tcp_prepare_packet(&pc->mscb, http_response, len);
-			free(http_response);
-			enq(&pc->oq, m);
-			break;
 		}
 	}
 
