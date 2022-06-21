@@ -1,0 +1,6 @@
+Instalation guide
+
+cd build
+make
+
+Point GNS3 VPCS executable to: build/vpcs

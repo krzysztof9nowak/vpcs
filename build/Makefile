@@ -2,11 +2,12 @@ OS:=$(shell uname)
 ARCH:=$(shell uname -m)
 
 HVOPT=-DHV
-CFLAGS=$(HVOPT) -Wall -O2
+CFLAGS=$(HVOPT) -Wall
 LDFLAGS=-lpthread -lutil
 
 RM=rm -f
 CC=gcc
+OPTIMIZATION=-O2
 
 
 ifeq ($(OS),Linux)
@@ -71,13 +72,16 @@ OBJS = $(patsubst $(SOURCEDIR)/%.c,%.o,$(SOURCES))
 all: vpcs
 
 vpcs: $(OBJS)
-	$(CC) $(OBJS) -o $(TARGET) $(LDFLAGS) 
+	$(CC) $(OBJS) -o $(TARGET) $(LDFLAGS) $(OPTIMIZATION)
+
+debug: OPTIMIZATION=-g
+debug: vpcs
 
 website.c: website.html
 	xxd -i website.html > website.c
 
 %.o: $(SOURCEDIR)/%.c $(SOURCEDIR)/*.h
-	$(CC) $(INCLUDE_PATH) $(CFLAGS) -c $<
+	$(CC) $(OPTIMIZATION) $(CFLAGS) -c $<
 
 clean:
 	$(RM) $(OBJS) $(TARGET)
